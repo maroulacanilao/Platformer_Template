@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-namespace Controller
+namespace Inputs
 {
     [System.Serializable]
     public struct ControllerInput
@@ -21,11 +21,11 @@ namespace Controller
         #region Components
 
         [Header("Components")]
-        private PlayerInput _playerInput;
+        private PlayerInput playerInput;
         [SerializeField] private PlayerCollision col;
         [SerializeField] private Particles.GhostTrail ghostTrail;
         private Rigidbody2D rb;
-        private ControllerInput _inputs;
+        public ControllerInput inputs;
         private Animator animator;
         private SpriteRenderer spriteRenderer;
 
@@ -99,7 +99,7 @@ namespace Controller
         private void Awake()
         {
             // assign components
-            _playerInput = GetComponent<PlayerInput>();
+            playerInput = GetComponent<PlayerInput>();
             rb = GetComponent<Rigidbody2D>();
             col = GetComponentInChildren<PlayerCollision>();
             // spriteRenderer = GetComponent<SpriteRenderer>();
@@ -111,10 +111,10 @@ namespace Controller
             //ghostTrail.enabled = false;
             
             // assign inputs
-            jumpAction = _playerInput.actions["Jump"];
-            dashAction = _playerInput.actions["Dash"];
-            moveAction = _playerInput.actions["Move"];
-            attackAction = _playerInput.actions["Attack"];
+            jumpAction = playerInput.actions["Jump"];
+            dashAction = playerInput.actions["Dash"];
+            moveAction = playerInput.actions["Move"];
+            attackAction = playerInput.actions["Attack"];
             AssignInputs();
         }
         
@@ -124,7 +124,6 @@ namespace Controller
             MoveUpdate();
             JumpUpdate();
             DashUpdate();
-            Debug.Log(rb.velocity);
         }
 
         private void LateUpdate() { UpdateValues(); }
@@ -140,8 +139,8 @@ namespace Controller
             
             CustomEvents.Events.OnPlayerChangeState.Invoke(this, currentState);
         }
-        
-        void UpdateValues()
+
+        private void UpdateValues()
         {
             if (!hasLanded && col.isGrounded)
             {
@@ -173,22 +172,22 @@ namespace Controller
         {
             if(isWallJumping) return;
             
-            _inputs.RawX = (int) context.ReadValue<Vector2>().x;
-            _inputs.RawY = (int) context.ReadValue<Vector2>().y;
-            _inputs.X = context.ReadValue<Vector2>().x;
-            _inputs.Y = context.ReadValue<Vector2>().y;
+            inputs.RawX = (int) context.ReadValue<Vector2>().x;
+            inputs.RawY = (int) context.ReadValue<Vector2>().y;
+            inputs.X = context.ReadValue<Vector2>().x;
+            inputs.Y = context.ReadValue<Vector2>().y;
             
             bool isPrevLeft = facingLeft;
             //facingLeft = _inputs.RawX != 1 && (_inputs.RawX == -1 || facingLeft);
-            facingLeft = Mathf.Approximately(_inputs.X, 0) ? facingLeft : _inputs.X < 0;
+            facingLeft = Mathf.Approximately(inputs.X, 0) ? facingLeft : inputs.X < 0;
         
             // if change of orientation
-            if(isPrevLeft != facingLeft) groundParticle.Play();
+            if(isPrevLeft != facingLeft && col.isGrounded) groundParticle.Play();
             
             // spriteRenderer.flipX = facingLeft;
 
-            isPushingLeftWall = col.onLeftWall && _inputs.X < 0;
-            isPushingRightWall = col.onRightWall && _inputs.X > 0;
+            isPushingLeftWall = col.onLeftWall && inputs.X < 0;
+            isPushingRightWall = col.onRightWall && inputs.X > 0;
         }
         
         public void Jump(InputAction.CallbackContext context)
@@ -228,7 +227,7 @@ namespace Controller
             if(Time.time < timeLastAttack + dashCooldown) return;
             
             // dash
-            dashDir = new Vector2(_inputs.X, _inputs.Y).normalized;
+            dashDir = new Vector2(inputs.X, inputs.Y).normalized;
             
             if (dashDir == Vector2.zero) dashDir = facingLeft ? Vector2.left : Vector2.right;
 
@@ -243,38 +242,52 @@ namespace Controller
             dashParticle.transform.position = facingLeft
                 ? (Vector2) transform.position + col.leftOffset
                 : (Vector2) transform.position + col.rightOffset;
+
+            Quaternion dashParticleRot = dashParticle.transform.rotation;
+            
+            dashParticle.transform.rotation = facingLeft
+                ? new Quaternion(dashParticleRot.x, dashParticleRot.y, 270, dashParticleRot.w)
+                : new Quaternion(dashParticleRot.x, dashParticleRot.y, 90, dashParticleRot.w);
+
             dashParticle.Play();
         }
         
         #endregion
         
         #region Movement Update
-        
-        void MoveUpdate()
+
+        private void MoveUpdate()
         {
             if(!canMove) return;
             if(isAttacking) return;
             if(isWallJumping) return;
-
+            
+            Vector2 velocity = rb.velocity;
+            
             float newAcceleration = col.isGrounded ? acceleration : acceleration / 2f;
 
-            if (_inputs.X < 0)
+            switch (inputs.X)
             {
-                if (rb.velocity.x > 0) _inputs.X = 0;
-                _inputs.X = Mathf.MoveTowards(_inputs.X, -1, newAcceleration * Time.deltaTime);
-            }
-            else if (_inputs.Y > 0)
-            {
-                if (rb.velocity.x < 0) _inputs.X = 0;
-                _inputs.X = Mathf.MoveTowards(_inputs.X, 1, newAcceleration * Time.deltaTime);
-            }
-            else
-            {
-                _inputs.X = Mathf.MoveTowards(_inputs.X, 0, newAcceleration * 2 * Time.deltaTime);
+                case < 0:
+                {
+                    if (velocity.x > 0) inputs.X = 0;
+                    inputs.X = Mathf.MoveTowards(inputs.X, -1, newAcceleration * Time.deltaTime);
+                    break;
+                }
+                case > 0:
+                {
+                    if (velocity.x < 0) inputs.X = 0;
+                    inputs.X = Mathf.MoveTowards(inputs.X, 1, newAcceleration * Time.deltaTime);
+                    break;
+                }
+                default:
+                    inputs.X = Mathf.MoveTowards(inputs.X, 0, newAcceleration * 2 * Time.deltaTime);
+                    break;
             }
 
-            Vector3 newVelocity = new Vector3(_inputs.X * movementSpeed, rb.velocity.y);
-            rb.velocity = Vector2.MoveTowards(rb.velocity, newVelocity, currentMoveLerpSpeed * Time.deltaTime);
+            
+            Vector3 newVelocity = new Vector3(inputs.X * movementSpeed, velocity.y);
+            rb.velocity = Vector2.MoveTowards(velocity, newVelocity, currentMoveLerpSpeed * Time.deltaTime);
         
             if(!hasLanded) return;
             if(isDashing) return;
@@ -282,7 +295,7 @@ namespace Controller
             // animator.Play(Mathf.Approximately(rb.velocity.x, 0) ? "Idle" : "Run");
         }
 
-        void JumpUpdate()
+        private void JumpUpdate()
         {
             if (jumpAction.IsPressed()) return;
             
@@ -291,8 +304,8 @@ namespace Controller
                 rb.velocity += Vector2.up * (fallMult * Physics2D.gravity.y * Time.deltaTime);
             }
         }
-        
-        void DashUpdate()
+
+        private void DashUpdate()
         {
             if (!isDashing) return;
             rb.velocity = dashDir * dashSpeed;

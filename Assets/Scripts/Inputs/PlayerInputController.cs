@@ -38,7 +38,7 @@ public partial class @PlayerInputController : IInputActionCollection2, IDisposab
                 },
                 {
                     ""name"": ""Move"",
-                    ""type"": ""Value"",
+                    ""type"": ""PassThrough"",
                     ""id"": ""6b8ebc45-f6cf-4fbf-a9e8-13c1f9b8b077"",
                     ""expectedControlType"": ""Vector2"",
                     ""processors"": """",

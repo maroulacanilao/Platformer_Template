@@ -9,7 +9,7 @@ namespace CustomEvents
     {
         public static readonly Evt OnGameOver;
         public static readonly Evt OnPlayerDies;
-        public static readonly Evt<Controller.PlayerController, Controller.PlayerState> OnPlayerChangeState;
+        public static readonly Evt<Inputs.PlayerController, Inputs.PlayerState> OnPlayerChangeState;
         
     }
 
