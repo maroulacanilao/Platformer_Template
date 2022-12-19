@@ -151,7 +151,7 @@ namespace Inputs
                 prevVelocityY = 0;
                 isWallJumping = false;
             }
-            else if (hasLanded && !col.isGrounded)
+            if (hasLanded && !col.isGrounded)
             {
                 hasLanded = false;
                 timeLastJumped = Time.time;
